@@ -9,7 +9,8 @@ public class GridCell
     public static Map map;
     public Vector2Int position = Vector2Int.zero;
     public Vector2 realPos = Vector2.zero;
-
+    private IEnumerator first;
+    private IEnumerator second;
     public GridCell(int x, int y)
     {
         asteroids = new HashSet<Asteroid>();
@@ -69,9 +70,19 @@ public class GridCell
 
     public void CheckAsteroids()
     {
-        //foreach (Asteroid a in asteroids)
+        //////////foreach (Asteroid a in asteroids)
         {
-            
+            //foreach (Asteroid b in asteroids)
+            {
+                //if (a != b)
+                {
+                    //if ((a.position - b.position).magnitude < map.asteroidRadiusSqr)
+                    {
+                        //a.position = new Vector2(Random.Range(0, map.realMapSize), Random.Range(0, map.realMapSize));
+                        //b.position = new Vector2(Random.Range(0, map.realMapSize), Random.Range(0, map.realMapSize));
+                    }
+                }
+            }
         }
 
     }

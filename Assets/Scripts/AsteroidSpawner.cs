@@ -17,7 +17,7 @@ public class AsteroidSpawner : MonoBehaviour
         spawnedAsteroid = Instantiate(asteroidPrefab, transform);
         spawnedAsteroid.transform.position = toSpawn.position;
         spawnedAsteroid.GetComponent<Rigidbody2D>().velocity = toSpawn.velocity;
-        Destroy(spawnedAsteroid, 5);
+        Destroy(spawnedAsteroid, 15);
     }
 
     // Start is called before the first frame update
