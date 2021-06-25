@@ -72,10 +72,6 @@ public class AsteroidManager : MonoBehaviour
         }
     }
 
-    private void PositionOverflow(Asteroid asteroid)
-    {
-
-    }
 
 
 }

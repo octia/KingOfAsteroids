@@ -8,61 +8,112 @@ public class Asteroid
     public Vector2 velocity = Vector2.zero;
     private GridCell host;
     public bool instantinated = false;
-
-
+    private bool toReplaceHost = false;
 
     public Asteroid(GridCell hostGrid)
     {
         host = hostGrid;
-        position = hostGrid.position;
+        hostGrid.asteroids.Add(this);
+        position = (Vector2)hostGrid.position * GridCell.map.gridSize;
         SetRandomVelocity(GridCell.map.asteroidMinSpeed, GridCell.map.asteroidMaxSpeed);
+        
     }
 
+    private int selectedNeighbour;
+    private Vector2 distFromCenter;
     public void Move(float stepSize)
     {
         position += velocity * stepSize;
 
-        float gridRadius = GridCell.map.gridSize / 2;
         
-        Vector2 distFromCenter = ((Vector2)host.position * gridRadius) - position;
+        
+        distFromCenter = position - host.realPos;
 
         /*Cell neighbour numbers are:
-        1 2 3
-        4 5 6
-        7 8 9
+        0 1 2
+        3 4 5
+        6 7 8
 
-        5 is the number of the current Cell
+        4 is the number of the current Cell
         */
 
-        int selectedNeighbour = 5;
-
-        if (distFromCenter.sqrMagnitude > gridRadius * gridRadius)
+        
+        float innerGridRadius = GridCell.map.gridRadius - GridCell.map.asteroidRadius;
+        float outerGridRadius = GridCell.map.gridRadius + GridCell.map.asteroidRadius;
+        if (distFromCenter.sqrMagnitude > innerGridRadius* innerGridRadius)
         {
-            if (distFromCenter.y > gridRadius)
+            #region removing asteroid if outside of cell range
+            if (distFromCenter.magnitude > outerGridRadius)
+            {
+                toReplaceHost = true;
+            }
+            #endregion
+
+            #region adding asteroid to another grid cell
+            selectedNeighbour = 4;
+            if (distFromCenter.y > innerGridRadius)
             {
                 selectedNeighbour -= 3;
             }
             else
             {
-                if (distFromCenter.y < -gridRadius)
+                if (distFromCenter.y < -innerGridRadius)
                 {
                     selectedNeighbour += 3;
                 }
             }
-            if (distFromCenter.x > gridRadius)
+            if (distFromCenter.x > innerGridRadius)
             {
-                selectedNeighbour -= 3;
+                selectedNeighbour += 1;
             }
             else
             {
-                if (distFromCenter.x < -gridRadius)
+                if (distFromCenter.x < -innerGridRadius)
                 {
-                    selectedNeighbour += 3;
+                    selectedNeighbour -= 1;
                 }
             }
+            if (selectedNeighbour >= 4)
+            {
+                selectedNeighbour--;
+            }
+            host.neighbours[selectedNeighbour].AddAsteroid(this);
+            if (toReplaceHost)
+            {
+                host.RemoveAsteroid(this);
+                host = host.neighbours[selectedNeighbour];
+            }
+            #endregion
+
         }
+
+        CheckOverflow();
+
     }
 
+    private void CheckOverflow()
+    {
+        if (position.x < 0)
+        {
+            position.x += GridCell.map.realMapSize;
+            instantinated = false;
+        }
+        if (position.y < 0)
+        {
+            position.y += GridCell.map.realMapSize;
+            instantinated = false;
+        }
+        if (position.x > GridCell.map.realMapSize)
+        {
+            position.x -= GridCell.map.realMapSize;
+            instantinated = false;
+        }
+        if (position.y > GridCell.map.realMapSize)
+        {
+            position.y -= GridCell.map.realMapSize;
+            instantinated = false;
+        }
+    }
 
     private void SetRandomVelocity(float minSpeed, float maxSpeed)
     {

@@ -19,31 +19,47 @@ public class GridCell
         realPos = (Vector2)position * map.gridSize;
     }
 
-    void TransferAsteroid(Asteroid toMove, GridCell target)
+    public void AddAsteroid(Asteroid toAdd)
     {
-        target.asteroids.Add(toMove);
-        asteroids.Remove(toMove);
+        if (!asteroids.Contains(toAdd))
+        {
+            asteroids.Add(toAdd);
+        }
     }
 
-    public void SetNeighbours(Map map)
+    public void RemoveAsteroid(Asteroid toRemove)
+    {
+        asteroids.Remove(toRemove);
+    }
+
+    public void SetNeighbours()
     {
         int i = 0;
         for (int y = 1; y >= -1; y--)
         {
             for (int x = -1; x <= 1; x++)
             {
-                if (x != 0 && y != 0)
+                if (x != 0 || y != 0)
                 {
                     int nPosX = position.x + x;
                     int nPosY = position.y + y;
-                    if (nPosX < 0 || nPosX == map.mapSize)
+                    if (nPosX < 0)
                     {
-                        nPosX = map.mapSize - Mathf.Abs(nPosX);
+                        nPosX += map.mapSize;
                     }
-                    if (nPosY < 0 || nPosY == map.mapSize)
+                    if (nPosX >= map.mapSize)
                     {
-                        nPosY = map.mapSize - Mathf.Abs(nPosY);
+                        nPosX -= map.mapSize;
                     }
+                    if (nPosY < 0)
+                    {
+                        nPosY += map.mapSize;
+                    }
+                    if (nPosY >= map.mapSize)
+                    {
+                        nPosY -= map.mapSize;
+                    }
+
                     neighbours[i] = map.map[nPosX, nPosY];
                     i++;
                 }
@@ -53,23 +69,11 @@ public class GridCell
 
     public void CheckAsteroids()
     {
-        foreach (GridCell nGrid in neighbours)
+        //foreach (Asteroid a in asteroids)
         {
-            foreach (Asteroid a1 in nGrid.asteroids)
-            {
-                foreach (Asteroid a2 in asteroids)
-                {
-                    if (a1 == a2)
-                    {
-                        continue;
-                    }
-                    if ((a1.position - a2.position).sqrMagnitude < map.asteroidSizeSqr)
-                    {
-                        Debug.Log("Boom");
-                    }
-                }
-            }
+            
         }
+
     }
 }
 

@@ -15,9 +15,9 @@ public class AsteroidSpawner : MonoBehaviour
     {
         GameObject spawnedAsteroid;
         spawnedAsteroid = Instantiate(asteroidPrefab, transform);
-        spawnedAsteroid.transform.position = toSpawn.position * gridCellSize;
+        spawnedAsteroid.transform.position = toSpawn.position;
         spawnedAsteroid.GetComponent<Rigidbody2D>().velocity = toSpawn.velocity;
-        Destroy(spawnedAsteroid, 10);
+        Destroy(spawnedAsteroid, 5);
     }
 
     // Start is called before the first frame update
@@ -42,6 +42,6 @@ public class AsteroidSpawner : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        Debug.Log(1/Time.deltaTime);
+        //Debug.Log(1/Time.deltaTime);
     }
 }

@@ -250,7 +250,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   asteroidPrefab: {fileID: 5097428837952243314, guid: efcf5464cd2a10c44999150b8eacc91a,
     type: 3}
-  mapSize: 175
+  mapSize: 20
   asteroidDistance: 5.2
 --- !u!114 &1530037604
 MonoBehaviour:
@@ -267,7 +267,7 @@ MonoBehaviour:
   playerGO: {fileID: 1900263374}
   asteroidSize: 1
   gridCellSize: 5
-  mapSize: 160
+  mapSize: 20
   asteroidMaxSpeed: 20
   asteroidMinSpeed: 3
 --- !u!1 &1900263374
