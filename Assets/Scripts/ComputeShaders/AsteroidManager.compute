@@ -1,0 +1,381 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel Move
+#pragma kernel Collide
+#define objectToVisible 3
+#define objectVisible 4
+#define objectDefault 3
+#define objectToInvisible 1
+#define objectInvisible 0
+
+
+struct Asteroid
+{
+    float2 position;
+    float2 velocity;
+    int2 hostPosition;
+};
+
+struct MoveResult 
+{
+    int moveToNeighbour;
+    int toReplaceHost;
+    int isVisible;
+};
+
+struct CollisionCheck
+{
+    int colCount;
+};
+
+struct PotentialCollision
+{
+    int asteroidNum;
+};
+
+struct CollisionResult
+{
+    float respawnCooldown;
+};
+
+float stepSize;
+int mapSize;
+float asteroidSize;
+
+float visibleSizeX;
+float visibleSizeY;
+
+float2 playerSpeed;
+
+float maxSpeed;
+float minSpeed;
+
+int asteroidCount;
+int maxCollisions;
+
+int destroyedAsteroid;
+
+float respawnCooldown;
+int randomNumber = 0;
+
+
+RWStructuredBuffer<Asteroid> asteroids;
+RWStructuredBuffer<MoveResult> moveResults;
+RWStructuredBuffer<PotentialCollision> potentialCollisions;
+globallycoherent RWStructuredBuffer<CollisionCheck> collisionChecks;
+globallycoherent RWStructuredBuffer<CollisionResult> collisionResults;
+
+
+void AddAsteroidToNeighbourCol(int asteroidNum)
+{
+    int2 gridPos = asteroids[asteroidNum].hostPosition;
+    int neighbourOffset = moveResults[asteroidNum].moveToNeighbour;
+    if (neighbourOffset < 3)
+    {
+        gridPos.y += 1;
+    }
+    if (neighbourOffset > 5)
+    {
+        gridPos.y -= 1;
+    }
+    if (neighbourOffset == 2 || neighbourOffset == 5 || neighbourOffset == 8)
+    {
+        gridPos.x += 1;
+    }
+    if (neighbourOffset == 0 || neighbourOffset == 3 || neighbourOffset == 6)
+    {
+        gridPos.x -= 1;
+    }
+    if (gridPos.x < 0)
+    {
+        gridPos.x += mapSize;
+    }
+    if (gridPos.x >= mapSize)
+    {
+        gridPos.x -= mapSize;
+    }
+    if (gridPos.y < 0)
+    {
+        gridPos.y += mapSize;
+    }
+    if (gridPos.y >= mapSize)
+    {
+        gridPos.y -= mapSize;
+    }
+    int newGridNum = gridPos.x * mapSize + gridPos.y;
+    potentialCollisions[newGridNum * maxCollisions + collisionChecks[newGridNum].colCount].asteroidNum = asteroidNum;
+    if (collisionChecks[newGridNum].colCount < maxCollisions)
+    {
+        collisionChecks[newGridNum].colCount++;
+    }
+
+
+}
+
+
+void DestroyAsteroid(int num)
+{
+    collisionResults[num].respawnCooldown = respawnCooldown;
+    asteroids[num].position.x = -100;
+    asteroids[num].position.y = -100;
+    asteroids[num].hostPosition.x = -100;
+    asteroids[num].hostPosition.y = -100;
+    asteroids[num].velocity.x = 0;
+    asteroids[num].velocity.y = 0;
+}
+
+// TODO: change the function into a buffer of random values from CPU
+float2 randFloat2(float uvX, float uvY, float min, float max, bool includeNegative)
+{
+    float2 uv = float2((uvY + playerSpeed.x) / (uvX + randomNumber) - randomNumber, uvY + playerSpeed.y);
+    float resultX = 0;
+    float resultY = 0;
+    max = max - min;
+    
+    resultX = frac(sin(dot(uv, float2(-12.9898, 76.243))) * 43758.5453);
+    resultY = frac(sin(dot(uv, float2(67.2123, -33.451))) * 12314.2231);
+    randomNumber *= 1+2*sin(resultX + resultY);
+    if (includeNegative)
+    {
+        resultX -= 0.5f;
+        resultY -= 0.5f;
+        resultX *= 2;
+        resultY *= 2;
+        
+    }
+    resultX *= max;
+    resultY *= max;
+    
+    if (resultX > 0)
+    {
+        resultX += min;
+    }
+    else
+    {
+        resultX -= min;
+    }
+    if (resultY > 0)
+    {
+        resultY += min;
+    }
+    else
+    {
+        resultY -= min;
+    }
+    
+    return float2(resultX, resultY);
+}
+
+
+[numthreads(32,1,1)]
+void Move(uint3 id : SV_DispatchThreadID)
+{
+    int asteroidNum = id.x;
+
+    if (asteroids[asteroidNum].position.x > -10 && asteroids[asteroidNum].position.y > -10) 
+    // -10 is a random negative value, it's only important for it to be between -1 and -100
+    // -1 is around the border of the simulated map, -100 is the place in which destroyed asteroids are kept
+    // todo: change to defines anyway
+    {
+        asteroids[asteroidNum].position += (asteroids[asteroidNum].velocity + playerSpeed) * stepSize;
+        float2 distFromCenter = asteroids[asteroidNum].position - asteroids[asteroidNum].hostPosition;
+        int gridNum = asteroids[asteroidNum].hostPosition.x * mapSize + asteroids[asteroidNum].hostPosition.y;
+        
+        // 0.5 is the radius of 1 grid
+        float innerGridRadius = 0.5 - asteroidSize;
+        float outerGridRadius = 0.5 + asteroidSize;
+    
+        moveResults[asteroidNum].moveToNeighbour = 4;
+        moveResults[asteroidNum].toReplaceHost = 4;
+        moveResults[asteroidNum].isVisible = objectDefault; // 4 means visible, 3 means state changed to visible, 1 means state changed to not visible, 0 means not visible
+
+        bool swapHost = false;
+        if (distFromCenter.x > outerGridRadius || distFromCenter.y > outerGridRadius || distFromCenter.x < -outerGridRadius || distFromCenter.y < -outerGridRadius)
+        {
+            swapHost = true;
+        }
+        else
+        {
+            AddAsteroidToNeighbourCol(asteroidNum);
+        }
+		
+		
+        if (distFromCenter.y > innerGridRadius)
+        {
+            moveResults[asteroidNum].moveToNeighbour -= 3;
+            AddAsteroidToNeighbourCol(asteroidNum);
+
+        }
+        else
+        {
+            if (distFromCenter.y < -innerGridRadius)
+            {
+                moveResults[asteroidNum].moveToNeighbour += 3;
+                AddAsteroidToNeighbourCol(asteroidNum);
+            }
+        }
+        if (distFromCenter.x > innerGridRadius)
+        {
+            moveResults[asteroidNum].moveToNeighbour += 1;
+            AddAsteroidToNeighbourCol(asteroidNum);
+        }
+        else
+        {
+            if (distFromCenter.x < -innerGridRadius)
+            {
+                moveResults[asteroidNum].moveToNeighbour -= 1;
+                AddAsteroidToNeighbourCol(asteroidNum);
+            }
+        }
+
+        if (swapHost)
+        {
+            moveResults[asteroidNum].toReplaceHost = moveResults[asteroidNum].moveToNeighbour;
+            if (moveResults[asteroidNum].toReplaceHost < 3)
+            {
+                asteroids[asteroidNum].hostPosition.y += 1;
+            }
+            if (moveResults[asteroidNum].toReplaceHost > 5)
+            {
+                asteroids[asteroidNum].hostPosition.y -= 1;
+            }
+            if (moveResults[asteroidNum].toReplaceHost == 2 || moveResults[asteroidNum].toReplaceHost == 5 || moveResults[asteroidNum].toReplaceHost == 8)
+            {
+                asteroids[asteroidNum].hostPosition.x += 1;
+            }
+            if (moveResults[asteroidNum].toReplaceHost == 0 || moveResults[asteroidNum].toReplaceHost == 3 || moveResults[asteroidNum].toReplaceHost == 6)
+            {
+                asteroids[asteroidNum].hostPosition.x -= 1;
+            }
+            moveResults[asteroidNum].moveToNeighbour = 4;
+        }
+	
+        // wrapping after passing the border of the map
+        if (asteroids[asteroidNum].position.x > mapSize)
+        {
+            asteroids[asteroidNum].position.x -= mapSize;
+        }
+        if (asteroids[asteroidNum].position.y > mapSize)
+        {
+            asteroids[asteroidNum].position.y -= mapSize;
+        }
+        if (asteroids[asteroidNum].position.x < -0.5)
+        {
+            asteroids[asteroidNum].position.x += mapSize;
+        }
+        if (asteroids[asteroidNum].position.y < -0.5)
+        {
+            asteroids[asteroidNum].position.y += mapSize;
+        }
+
+        if (asteroids[asteroidNum].position.x < (((uint) mapSize / 2) + visibleSizeX) && asteroids[asteroidNum].position.x > (((uint) mapSize / 2) - visibleSizeX) && asteroids[asteroidNum].position.y < ((uint) mapSize / 2 + visibleSizeY) && asteroids[asteroidNum].position.y > ((uint) mapSize / 2 - visibleSizeY))
+        {
+            if (moveResults[asteroidNum].isVisible < objectDefault)
+            {
+                moveResults[asteroidNum].isVisible = objectToVisible;
+            }
+            else
+            {
+                moveResults[asteroidNum].isVisible = objectVisible;
+            }
+        }
+        else
+        {
+            if (moveResults[asteroidNum].isVisible > objectToInvisible)
+            {
+                moveResults[asteroidNum].isVisible = objectToInvisible;
+            }
+            else
+            {
+                moveResults[asteroidNum].isVisible = objectInvisible;
+            }
+        }
+
+
+    }
+    else
+    {
+        if (moveResults[asteroidNum].isVisible > objectToInvisible)
+        {
+            moveResults[asteroidNum].isVisible = objectToInvisible;
+        }
+        else
+        {
+            moveResults[asteroidNum].isVisible = objectInvisible;
+        }
+        if (collisionResults[asteroidNum].respawnCooldown <= 0 && collisionResults[asteroidNum].respawnCooldown > -0.8)
+        {
+            float2 newPos = float2(((uint) mapSize) / 2, ((uint) mapSize) / 2);
+            newPos += randFloat2(asteroidNum, 1, visibleSizeX, ((uint) mapSize) / 2, true);
+
+            asteroids[asteroidNum].position = newPos;
+            asteroids[asteroidNum].velocity = randFloat2(asteroidNum, 2, minSpeed, maxSpeed, true);
+            asteroids[asteroidNum].hostPosition = (int2) asteroids[asteroidNum].position;
+            collisionResults[asteroidNum].respawnCooldown = -1;
+            
+        }
+        else
+        {
+            collisionResults[asteroidNum].respawnCooldown = 0.01;
+
+        }
+    }
+
+}
+
+
+
+// this function is ran on all gridcells of the map, and simulates collision between all  
+[numthreads(32, 1, 1)]
+void Collide(uint3 id : SV_DispatchThreadID)
+{
+    int colId = id.x;
+    if (collisionResults[colId].respawnCooldown >= 0)
+    {
+        collisionResults[colId].respawnCooldown -= stepSize;
+    }
+    
+	for (int i = 0; i < collisionChecks[colId].colCount; i++)
+    {
+		for (int j = i; j <= collisionChecks[colId].colCount; j++)
+        {
+			int a1 = potentialCollisions[colId * maxCollisions + i].asteroidNum;
+			int a2 = potentialCollisions[colId * maxCollisions + j].asteroidNum;
+            if (a1 != a2)
+            {
+                if (a1 == destroyedAsteroid)
+                {
+                    DestroyAsteroid(a1);
+                }
+                else
+                {
+                    if (a2 == destroyedAsteroid)
+                    {
+                        DestroyAsteroid(a2);
+                    }
+                    else
+                    {
+                    
+                        if (asteroids[a1].position.x > -10 && asteroids[a2].position.x > -10)
+                        {
+                            float2 dist = asteroids[a1].position - asteroids[a2].position;
+                            float distXSqr = dist.x * dist.x;
+                            float distYSqr = dist.y * dist.y;
+                            if (distXSqr + distYSqr < 2 * asteroidSize * 2 * asteroidSize)
+                            {
+                                DestroyAsteroid(a1);
+                                DestroyAsteroid(a2);
+                            }
+                            else
+                            {
+                                collisionResults[a1].respawnCooldown = -1;
+                                collisionResults[a2].respawnCooldown = -1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+	}
+}
+
+
