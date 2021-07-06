@@ -1,2 +1,2 @@
 # KingOfAsteroids
-A space-shooter game about efficient simulation of a large amount of asteroids.
+A space-shooter game about high-preformance simulation of a large amount of asteroids using compute shaders.
